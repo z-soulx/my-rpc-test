@@ -15,6 +15,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  **/
 public class InFlightRequests implements Closeable {
     private final static long TIMEOUT_SEC = 10L;
+    // 背压机制  防止服务端消费过慢，客户端内存爆表
     private final Semaphore semaphore = new Semaphore(10);
     private final Map<Integer, ResponseFuture> futureMap = new ConcurrentHashMap<>();
 //    ScheduledExecutorService service = new ThreadPoolExecutor(1,1,0,NANOSECONDS,延时队列,Executors.defaultThreadFactory(), new ThreadPoolExecutor.AbortPolicy());
@@ -32,6 +33,8 @@ public class InFlightRequests implements Closeable {
         }
     }
 
+
+// 超时释放
     private void removeTimeoutFutures() {
         futureMap.entrySet().removeIf(entry -> {
             if( System.nanoTime() - entry.getValue().getTimestamp() > TIMEOUT_SEC * 1000000000L) {
@@ -42,7 +45,7 @@ public class InFlightRequests implements Closeable {
             }
         });
     }
-
+//移除对应请求
     public ResponseFuture remove(int requestId) {
         ResponseFuture future = futureMap.remove(requestId);
         if(null != future) {
@@ -50,7 +53,7 @@ public class InFlightRequests implements Closeable {
         }
         return future;
     }
-
+// 重写关闭
     @Override
     public void close() {
         scheduledFuture.cancel(true);
